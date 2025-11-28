@@ -21,6 +21,11 @@ build/
 venv/
 ENV/
 
+# API Keys (NEVER commit these!)
+*api_key*.txt
+*api_key*.json
+*.key
+
 # IDE
 .idea/
 .vscode/

@@ -11,7 +11,11 @@ from vllm import LLM, SamplingParams
 from transformers import AutoTokenizer
 
 
-class VLLMPredictor:
+# Models that support enable_thinking parameter in chat template
+QWEN_THINKING_MODELS = ["Qwen3", "Qwen3-4B-Thinking", "Qwen3-8B-Thinking"]
+
+
+class RecipePredictor:
     """Recipe predictor using vLLM for fast inference."""
 
     def __init__(
@@ -29,7 +33,12 @@ class VLLMPredictor:
         self.enable_thinking = enable_thinking
         self.prediction_prompt = open(prompt_filename).read()
 
+        # Detect model type for chat template handling
+        self.is_qwen_thinking = any(m in model_name for m in QWEN_THINKING_MODELS)
+        self.is_deepseek_r1 = "DeepSeek-R1" in model_name
+
         print(f"Loading model {model_name} with vLLM...")
+        print(f"Model type: {'Qwen-Thinking' if self.is_qwen_thinking else 'DeepSeek-R1' if self.is_deepseek_r1 else 'Standard'}")
 
         self.tokenizer = AutoTokenizer.from_pretrained(model_name)
         self.llm = LLM(
@@ -62,12 +71,22 @@ class VLLMPredictor:
     def _format_prompt(self, prompt: str) -> str:
         """Format prompt using chat template."""
         messages = [{"role": "user", "content": prompt}]
-        return self.tokenizer.apply_chat_template(
-            messages,
-            tokenize=False,
-            add_generation_prompt=True,
-            enable_thinking=self.enable_thinking,
-        )
+
+        if self.is_qwen_thinking:
+            # Qwen3-Thinking models support enable_thinking parameter
+            return self.tokenizer.apply_chat_template(
+                messages,
+                tokenize=False,
+                add_generation_prompt=True,
+                enable_thinking=self.enable_thinking,
+            )
+        else:
+            # DeepSeek-R1 and other models use standard chat template
+            return self.tokenizer.apply_chat_template(
+                messages,
+                tokenize=False,
+                add_generation_prompt=True,
+            )
 
     def predict_batch(self, prompts: list) -> list:
         """Generate predictions for a batch of prompts."""
@@ -154,7 +173,7 @@ def predict(
         print("No samples to process")
         return output_filename
 
-    predictor = VLLMPredictor(
+    predictor = RecipePredictor(
         model_name=model_name,
         max_new_tokens=max_new_tokens,
         temperature=temperature,
