@@ -8,7 +8,6 @@ import fire
 import jsonlines
 from tqdm import tqdm
 
-
 def get_openrouter_api_key() -> str:
     """Get OpenRouter API key from environment variable."""
     api_key = os.environ.get("OPENROUTER_API_KEY")
