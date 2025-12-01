@@ -14,6 +14,17 @@ from transformers import AutoTokenizer
 # Models that support enable_thinking parameter in chat template
 QWEN_THINKING_MODELS = ["Qwen3", "Qwen3-4B-Thinking", "Qwen3-8B-Thinking"]
 
+# DeepSeek-R1 models (including distilled versions)
+DEEPSEEK_R1_MODELS = [
+    "DeepSeek-R1",
+    "DeepSeek-R1-Distill-Qwen-1.5B",
+    "DeepSeek-R1-Distill-Qwen-7B",
+    "DeepSeek-R1-Distill-Qwen-14B",
+    "DeepSeek-R1-Distill-Qwen-32B",
+    "DeepSeek-R1-Distill-Llama-8B",
+    "DeepSeek-R1-Distill-Llama-70B",
+]
+
 
 class RecipePredictor:
     """Recipe predictor using vLLM for fast inference."""
@@ -35,7 +46,7 @@ class RecipePredictor:
 
         # Detect model type for chat template handling
         self.is_qwen_thinking = any(m in model_name for m in QWEN_THINKING_MODELS)
-        self.is_deepseek_r1 = "DeepSeek-R1" in model_name
+        self.is_deepseek_r1 = any(m in model_name for m in DEEPSEEK_R1_MODELS)
 
         print(f"Loading model {model_name} with vLLM...")
         print(f"Model type: {'Qwen-Thinking' if self.is_qwen_thinking else 'DeepSeek-R1' if self.is_deepseek_r1 else 'Standard'}")
@@ -81,7 +92,8 @@ class RecipePredictor:
                 enable_thinking=self.enable_thinking,
             )
         else:
-            # DeepSeek-R1 and other models use standard chat template
+            # DeepSeek-R1 (including Distill versions) and other models use standard chat template
+            # DeepSeek-R1 models always output <think>...</think> tags (handled by extract_response)
             return self.tokenizer.apply_chat_template(
                 messages,
                 tokenize=False,
@@ -113,7 +125,7 @@ class RecipePredictor:
 
 
 def predict(
-    model_name: str = "Qwen/Qwen3-4B-Thinking-2507",
+    model_name: str = "Qwen/Qwen3-4B-Thinking-2507",    # Qwen/Qwen3-4B-Thinking-2507, deepseek-ai/DeepSeek-R1-Distill-Qwen-7B, deepseek-ai/DeepSeek-R1-Distill-Llama-8B
     prompt_name: str = "prediction",
     split: str = "test_high_impact",
     max_new_tokens: int = 8192,
