@@ -8,6 +8,7 @@ import jsonlines
 from tqdm import tqdm
 import fire
 from vllm import LLM, SamplingParams
+from vllm.lora.request import LoRARequest
 from transformers import AutoTokenizer
 
 
@@ -24,6 +25,11 @@ DEEPSEEK_R1_MODELS = [
     "DeepSeek-R1-Distill-Llama-8B",
     "DeepSeek-R1-Distill-Llama-70B",
 ]
+
+# Chemistry/Materials science LLMs: model_name -> (base_model, is_lora_adapter)
+CHEMICAL_LLMS = {
+    "LlaSMol-Mistral-7B": ("mistralai/Mistral-7B-v0.1", True),
+}
 
 
 class RecipePredictor:
@@ -47,18 +53,47 @@ class RecipePredictor:
         # Detect model type for chat template handling
         self.is_qwen_thinking = any(m in model_name for m in QWEN_THINKING_MODELS)
         self.is_deepseek_r1 = any(m in model_name for m in DEEPSEEK_R1_MODELS)
+        self.is_chemical_llm = any(m in model_name for m in CHEMICAL_LLMS.keys())
+
+        # Determine model type string for logging
+        if self.is_qwen_thinking:
+            model_type = "Qwen-Thinking"
+        elif self.is_deepseek_r1:
+            model_type = "DeepSeek-R1"
+        elif self.is_chemical_llm:
+            model_type = "Chemical-LLM"
+        else:
+            model_type = "Standard"
 
         print(f"Loading model {model_name} with vLLM...")
-        print(f"Model type: {'Qwen-Thinking' if self.is_qwen_thinking else 'DeepSeek-R1' if self.is_deepseek_r1 else 'Standard'}")
+        print(f"Model type: {model_type}")
 
-        self.tokenizer = AutoTokenizer.from_pretrained(model_name)
+        # Load tokenizer and model (handle LoRA adapters for chemical LLMs)
+        tokenizer_name = model_name
+        actual_model_name = model_name
+        self.lora_request = None
+
+        if self.is_chemical_llm:
+            for key, (base_model, is_lora) in CHEMICAL_LLMS.items():
+                if key in model_name:
+                    tokenizer_name = base_model
+                    if is_lora:
+                        actual_model_name = base_model
+                        self.lora_request = LoRARequest("chemical_lora", 1, model_name)
+                        print(f"Using base model: {base_model} with LoRA adapter: {model_name}")
+                    else:
+                        print(f"Using base tokenizer: {tokenizer_name}")
+                    break
+
+        self.tokenizer = AutoTokenizer.from_pretrained(tokenizer_name, trust_remote_code=True)
         self.llm = LLM(
-            model=model_name,
+            model=actual_model_name,
             tensor_parallel_size=tensor_parallel_size,
             gpu_memory_utilization=gpu_memory_utilization,
             max_model_len=16384,
             trust_remote_code=True,
             dtype="bfloat16",
+            enable_lora=self.lora_request is not None,
         )
         self.sampling_params = SamplingParams(
             temperature=temperature,
@@ -91,6 +126,9 @@ class RecipePredictor:
                 add_generation_prompt=True,
                 enable_thinking=self.enable_thinking,
             )
+        elif self.is_chemical_llm:
+            # LlaSMol uses Mistral instruction format: <s>[INST] {prompt} [/INST]
+            return f"<s>[INST] {prompt} [/INST]"
         else:
             # DeepSeek-R1 (including Distill versions) and other models use standard chat template
             # DeepSeek-R1 models always output <think>...</think> tags (handled by extract_response)
@@ -103,7 +141,10 @@ class RecipePredictor:
     def predict_batch(self, prompts: list) -> list:
         """Generate predictions for a batch of prompts."""
         formatted_prompts = [self._format_prompt(p) for p in prompts]
-        outputs = self.llm.generate(formatted_prompts, self.sampling_params)
+        if self.lora_request:
+            outputs = self.llm.generate(formatted_prompts, self.sampling_params, lora_request=self.lora_request)
+        else:
+            outputs = self.llm.generate(formatted_prompts, self.sampling_params)
         return [self.extract_response(o.outputs[0].text) for o in outputs]
 
     def predict(self, dataset, batch_size: int = 8):
@@ -125,7 +166,7 @@ class RecipePredictor:
 
 
 def predict(
-    model_name: str = "Qwen/Qwen3-4B-Thinking-2507",    # Qwen/Qwen3-4B-Thinking-2507, deepseek-ai/DeepSeek-R1-Distill-Qwen-7B, deepseek-ai/DeepSeek-R1-Distill-Llama-8B
+    model_name: str = "Qwen/Qwen3-4B-Thinking-2507",    # Qwen/Qwen3-4B-Thinking-2507, deepseek-ai/DeepSeek-R1-Distill-Qwen-7B, deepseek-ai/DeepSeek-R1-Distill-Llama-8B, osunlp/LlaSMol-Mistral-7B
     prompt_name: str = "prediction",
     split: str = "test_high_impact",
     max_new_tokens: int = 8192,
