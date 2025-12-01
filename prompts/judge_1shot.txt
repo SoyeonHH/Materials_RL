@@ -1,0 +1,223 @@
+You are an expert materials scientist tasked with evaluating an AI-generated synthesis recipe. You will be provided with:
+1. Target material description
+2. AI-generated recipe
+3. Ground truth recipe from literature
+
+Please evaluate the AI-generated recipe according to the following criteria on a scale of 1-5 (1.0: poor, 5.0: excellent, 0.5 step). Provide detailed justification for each score.
+
+Guidelines for evaluation:
+
+1. Materials
+- Appropriateness: Are the selected materials suitable for the target synthesis?
+
+2. Equipment
+- Appropriateness: Is the selected equipment suitable?
+
+3. Procedure
+- Completeness: Are all necessary steps included with sufficient detail?
+- Similarity: How closely does it match the ground truth procedure?
+- Feasibility: Can this procedure be realistically executed in a lab?
+
+4. Characterization
+- Appropriateness: Are the metrics suitable for validating success?
+- Similarity: How well do predicted properties match actual results?
+
+Your Output format must be as following:
+1. Step-by-step reasoning first
+2. JSON score result
+```json
+{
+    "materials_appropriateness_score": float, 
+    "equipment_appropriateness_score": float,
+    "procedure_completeness_score": float,
+    "procedure_similarity_score": float,
+    "procedure_feasibility_score": float,
+    "characterization_appropriateness_score": float,
+    "characterization_similarity_score": float,
+    "overall_score": float
+}
+```
+
+And here are the example judgments by the human evaluators:
+
+- Example 1 -
+# Key Contributions
+- Novel compounds: Multi-shelled ZnO decorated with nitrogen and phosphorus co-doped carbon quantum dots (NPCQD/ZnO).
+- Unique synthesis methods: Preparation via a simple absorption process and multi-shelled ZnO obtained using carbon microspheres as sacrificial templates.
+- Specific application: Enhanced photodegradation activity of methylene blue in aqueous solutions.
+
+# AI-Generated Recipe
+
+## Materials and Equipment
+
+- **Precursor materials**:
+  - Zinc acetate dihydrate (Zn(CH3COO)2·2H2O)
+    - Purity: 99.0%
+    - Supplier: Sigma-Aldrich, St. Louis, MO, USA
+    - Critical specifications: Particle size < 100 µm
+  - Ammonium phosphate dibasic ((NH4)2HPO4)
+    - Purity: 98.0%
+    - Supplier: Alfa Aesar, Ward Hill, MA, USA
+    - Critical specifications: Particle size < 50 µm
+  - Glucose (C6H12O6)
+    - Purity: 99.5%
+    - Supplier: Sigma-Aldrich, St. Louis, MO, USA
+    - Critical specifications: Granular form
+  - Ethanol (C2H5OH)
+    - Purity: 99.9%
+    - Supplier: Fisher Scientific, Waltham, MA, USA
+    - Critical specifications: Anhydrous
+  - Deionized water (DI water)
+    - Purity: Resistivity > 18.2 MΩ·cm
+
+- **Equipment and apparatus**:
+  - Hydrothermal reactor (Parr Instrument Company, model 4748)
+    - Volume: 100 mL
+    - Maximum temperature: 200 °C
+    - Maximum pressure: 2000 psi
+  - Muffle furnace (Thermo Scientific, model F6100)
+    - Temperature range: Ambient to 1200 °C
+  - Centrifuge (Eppendorf, model 5810R)
+    - Maximum speed: 15,000 rpm
+  - UV-Vis spectrophotometer (Agilent, model Cary 60)
+    - Wavelength range: 200-800 nm
+  - Transmission electron microscope (TEM, JEOL JEM-2100)
+  - Scanning electron microscope (SEM, Hitachi SU8010)
+
+## Synthesis Procedure
+
+1. **Preparation of Carbon Microspheres**:
+   - Dissolve 5 g of glucose in 50 mL of deionized water.
+   - Heat the solution to 180 °C in a hydrothermal reactor for 6 hours.
+   - Allow the reactor to cool to room temperature and collect the carbon microspheres by centrifugation at 10,000 rpm for 10 minutes.
+   - Wash the microspheres with ethanol and DI water to remove unreacted glucose, then dry them in a vacuum oven at 60 °C for 12 hours.
+
+2. **Synthesis of Multi-shelled ZnO**:
+   - Dissolve 10 g of zinc acetate dihydrate in 100 mL of ethanol to form a clear solution.
+   - Add 1 g of the prepared carbon microspheres to the zinc acetate solution and stir for 30 minutes.
+   - Transfer the mixture to a hydrothermal reactor and heat at 180 °C for 12 hours.
+   - After cooling, centrifuge the product at 10,000 rpm for 10 minutes and wash with DI water to remove excess zinc acetate.
+   - Dry the ZnO-coated carbon microspheres in a vacuum oven at 60 °C for 12 hours.
+
+3. **Doping with Nitrogen and Phosphorus**:
+   - Dissolve 0.5 g of ammonium phosphate dibasic in 50 mL of DI water.
+   - Add the dried ZnO-coated carbon microspheres to the solution and stir for 1 hour.
+   - Transfer the mixture to a muffle furnace and heat at 600 °C for 2 hours under nitrogen atmosphere to facilitate doping.
+   - Cool the product to room temperature and wash with DI water to remove unreacted ammonium phosphate.
+
+4. **Final Product Collection**:
+   - Collect the NPCQD/ZnO product by centrifugation at 10,000 rpm for 10 minutes.
+   - Dry the final product in a vacuum oven at 60 °C for 12 hours.
+
+## Characterization Methods
+
+- **Analytical techniques**:
+  - UV-Vis spectrophotometry for optical properties.
+  - TEM for morphological analysis.
+  - SEM for surface morphology.
+  - X-ray diffraction (XRD) for crystallinity.
+  
+- **Specific measurement conditions**:
+  - UV-Vis: Scan from 200 to 800 nm with a 1 cm path length cuvette.
+  - TEM: Operating voltage of 200 kV.
+  - SEM: Acceleration voltage of 15 kV.
+
+- **Sample preparation methods**:
+  - For UV-Vis: Dissolve NPCQD/ZnO in DI water to a concentration of 0.1 mg/mL.
+  - For TEM: Disperse NPCQD/ZnO in ethanol and drop-cast onto a carbon-coated copper grid.
+  - For SEM: Coat samples with a thin layer of gold for conductivity.
+
+## Product Characteristics
+- **Final product properties and specifications**:
+  - Morphological features: Multi-shelled structure with an average shell thickness of 20-30 nm.
+  - Average particle size: 100-200 nm as observed in SEM images.
+  - Optical properties: Absorption peak around 350 nm in UV-Vis spectra indicating effective light harvesting.
+  
+- **Performance metrics**:
+  - Photodegradation efficiency of methylene blue: >90% degradation within 60 minutes under UV light (λ = 365 nm).
+  
+- **Quality criteria**:
+  - Purity: Confirmed by XRD showing characteristic peaks of ZnO without impurities.
+  - Doping levels: Nitrogen and phosphorus content confirmed via elemental analysis (expected N and P content: 1-3 at%).
+
+# Ground Truth Recipe
+## Materials and Equipment
+### Materials
+- **Zinc Nitrate Hexahydrate (Zn(NO3)2·6H2O):** 
+  - Quantity: 45 g
+- **Sucrose:** 
+  - Quantity: 130 g
+  - Concentration: 1.5 mol/L
+- **Sodium Citrate Dihydrate:** 
+  - Quantity: 11.7 g
+- **Ammonium Dihydrogen Phosphate (ADP):** 
+  - Quantity: 0.5 g
+  - Molar Ratio: 10:1 with sodium citrate 
+- **Phosphoric Acid, Ethylenediamine, and Ethanol:**
+  - Reagent grade
+  - Supplier: National Pharmaceutical Group Chemical Reagent Co., Ltd.
+
+### Equipment
+- **Autoclave (500 mL, Teflon-lined stainless steel):** Used for hydrothermal synthesis at 200°C.
+- **Muffle Furnace:** Used for calcination at controlled temperatures.
+- **UV-Vis spectrophotometer (PerkinElmer LAMBDA 35):** Used for measuring MB concentration.
+- **F-4600 FL Spectrophotometer (5j24000 01 model):** Used for photoluminescence spectra at 325 nm excitation.
+- **X-ray Diffraction (XRD) (D8 ADVANCE and DAVINCI DESIGN):** For crystal structure analysis.
+- **Autosorb-iQ (Quantachrome Instruments):** For BET surface area measurement.
+- **Scanning Electron Microscopy (SEM) (Merlin compact-61-78):** Analyzing general morphology.
+- **Transmission Electron Microscopy (TEM):** For detailed structural analysis.
+- **300 W Xenon Lamp (PLS-SXE300):** For simulated daylight source.
+
+## Synthesis Procedure
+
+### Synthesis of Multi-Shelled ZnO Spheres
+1. Dissolve 130 g of sucrose in 250 mL deionized water, stir for 30 min at room temperature.
+2. Transfer to a 500 mL Teflon-lined stainless steel autoclave and heat at 200°C for 125 min.
+3. Cool to room temperature, wash with deionized water and ethanol, then dry at 60°C for 12 h to obtain carbon microsphere templates.
+4. Dissolve 45 g zinc nitrate hexahydrate in 30 mL mixed solution (10 mL ethanol and 20 mL deionized water).
+5. Disperse 1 g carbon microsphere templates in the solution, ultrasonicate for 15 min, then stir at 40°C for 12 h.
+6. Filter, wash, dry at 80°C for 12 h, then calcine: 
+   - Heat to 400°C at 1°C/min, maintain for 30 min.
+   - Further heat to 500°C, maintain for 60 min, cool naturally.
+
+### Synthesis of CQDs
+1. Dissolve 11.7 g sodium citrate and 0.5 g ammonium dihydrogen phosphate in 40 mL deionized water.
+2. Stir for 15 min at room temperature to form a solution.
+3. Transfer to a 100 mL Teflon-lined stainless steel autoclave, maintain at 160°C for 6 h.
+4. Cool, filter using a 0.25 µm membrane, and purify by dialysis membrane for 24 h.
+
+### Synthesis of CQD/ZnO Composites
+1. Disperse 0.1 g ZnO in 10 mL deionized water.
+2. Add solutions of CQDs (0.4 g, 0.8 g, 1.2 g, 2 g, 2.5 g NPCQD) to the dispersion.
+3. Stir at room temperature for 12 h, then centrifuge and wash.
+4. Dry at 80°C for 12 h to obtain the final composites.
+
+## Characterization Methods
+- **X-ray Diffraction (XRD):** Cu-Kα radiation in the 2θ range of 20–80°.
+- **BET Measurements:** N2 adsorption/desorption for surface area and pore size distribution.
+- **SEM & TEM Imaging:** For analyzing morphology and structure.
+- **UV-Vis Spectrophotometry:** For absorption studies.
+- **Photoluminescence Spectroscopy:** Room temperature, excitation at 325 nm.
+
+## Product Characteristics
+- **Purity:** High, with carbon quantum dots not exceeding 4%.
+- **BET Surface Area:** 17.43 m²/g.
+- **Photocatalytic Activity:** Enhanced degradation of methylene blue with reaction constant 0.0725 min⁻¹.
+- **Morphology:** Multi-shelled structure with uniform CQD dispersion.
+- **Optical Band Gap:** Calculated direct band-gaps around 3.13-3.14 eV for composites.
+
+# Experts Judgment
+
+```json
+{
+    "materials_appropriateness_score": 3.3, 
+    "equipment_appropriateness_score": 3.5,
+    "procedure_completeness_score": 5.0,
+    "procedure_similarity_score": 3.5,
+    "procedure_feasibility_score": 5.0,
+    "characterization_appropriateness_score": 4.5,
+    "characterization_similarity_score": 3.5,
+    "overall_score": 3.5
+}
+```
+
