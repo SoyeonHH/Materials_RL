@@ -26,6 +26,12 @@ DEEPSEEK_R1_MODELS = [
     "DeepSeek-R1-Distill-Llama-70B",
 ]
 
+# ChemDFM-R models (reasoning models with <think>/<answer> tags)
+CHEMDFM_R_MODELS = [
+    "ChemDFM-R-14B",
+    "RetroDFM-R-8B",
+]
+
 # Chemistry/Materials science LLMs: model_name -> (base_model, is_lora_adapter)
 CHEMICAL_LLMS = {
     "LlaSMol-Mistral-7B": ("mistralai/Mistral-7B-v0.1", True),
@@ -45,6 +51,7 @@ class RecipePredictor:
         gpu_memory_utilization: float = 0.9,
         tensor_parallel_size: int = 1,
         enable_thinking: bool = True,
+        max_model_len: int = None,
     ):
         self.model_name = model_name
         self.enable_thinking = enable_thinking
@@ -53,6 +60,7 @@ class RecipePredictor:
         # Detect model type for chat template handling
         self.is_qwen_thinking = any(m in model_name for m in QWEN_THINKING_MODELS)
         self.is_deepseek_r1 = any(m in model_name for m in DEEPSEEK_R1_MODELS)
+        self.is_chemdfm_r = any(m in model_name for m in CHEMDFM_R_MODELS)
         self.is_chemical_llm = any(m in model_name for m in CHEMICAL_LLMS.keys())
 
         # Determine model type string for logging
@@ -60,6 +68,8 @@ class RecipePredictor:
             model_type = "Qwen-Thinking"
         elif self.is_deepseek_r1:
             model_type = "DeepSeek-R1"
+        elif self.is_chemdfm_r:
+            model_type = "ChemDFM-R"
         elif self.is_chemical_llm:
             model_type = "Chemical-LLM"
         else:
@@ -86,15 +96,20 @@ class RecipePredictor:
                     break
 
         self.tokenizer = AutoTokenizer.from_pretrained(tokenizer_name, trust_remote_code=True)
-        self.llm = LLM(
-            model=actual_model_name,
-            tensor_parallel_size=tensor_parallel_size,
-            gpu_memory_utilization=gpu_memory_utilization,
-            max_model_len=16384,
-            trust_remote_code=True,
-            dtype="bfloat16",
-            enable_lora=self.lora_request is not None,
-        )
+
+        # Build LLM kwargs
+        llm_kwargs = {
+            "model": actual_model_name,
+            "tensor_parallel_size": tensor_parallel_size,
+            "gpu_memory_utilization": gpu_memory_utilization,
+            "trust_remote_code": True,
+            "dtype": "bfloat16",
+            "enable_lora": self.lora_request is not None,
+        }
+        if max_model_len is not None:
+            llm_kwargs["max_model_len"] = max_model_len
+
+        self.llm = LLM(**llm_kwargs)
         self.sampling_params = SamplingParams(
             temperature=temperature,
             top_p=top_p,
@@ -109,9 +124,15 @@ class RecipePredictor:
         return self.prediction_prompt.format(contributions=contributions)
 
     def extract_response(self, text: str) -> str:
-        """Extract final response, removing <think>...</think> tags."""
+        """Extract final response, removing <think>...</think> tags.
+
+        Also handles ChemDFM-R style <answer>...</answer> tags.
+        """
         if "</think>" in text:
             text = text.split("</think>")[-1].strip()
+        # Handle ChemDFM-R <answer>...</answer> tags
+        if "<answer>" in text and "</answer>" in text:
+            text = text.split("<answer>")[-1].split("</answer>")[0].strip()
         return text
 
     def _format_prompt(self, prompt: str) -> str:
@@ -178,6 +199,7 @@ def predict(
     gpu_memory_utilization: float = 0.9,
     tensor_parallel_size: int = 1,
     enable_thinking: bool = True,
+    max_model_len: int = None,
 ):
     """
     Run recipe prediction using Qwen3-4B-Thinking model with vLLM.
@@ -195,6 +217,7 @@ def predict(
         gpu_memory_utilization: GPU memory utilization (0.0-1.0)
         tensor_parallel_size: Number of GPUs for tensor parallelism
         enable_thinking: Enable thinking mode for Qwen3-Thinking models
+        max_model_len: Maximum model sequence length (None for model default)
     """
     from datasets import load_dataset
 
@@ -235,6 +258,7 @@ def predict(
         gpu_memory_utilization=gpu_memory_utilization,
         tensor_parallel_size=tensor_parallel_size,
         enable_thinking=enable_thinking,
+        max_model_len=max_model_len,
     )
 
     print(f"Starting predictions, output: {output_filename}")

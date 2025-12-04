@@ -24,6 +24,8 @@ VLLM_MODELS = [
     "Qwen/Qwen3-30B-A3B-Thinking-2507-FP8",
     "Qwen/Qwen3-30B-A3B-Thinking-2507",
     "Qwen/Qwen3-Next-80B-A3B-Thinking",
+    "deepseek-ai/DeepSeek-R1-Distill-Qwen-32B",
+    "PrimeIntellect/INTELLECT-3-FP8",
 ]
 
 # Supported quantization methods
@@ -174,7 +176,8 @@ class RecipeJudge:
     def _judge_vllm(self, item: dict) -> str:
         """Evaluate using local vLLM model."""
         user_content = USER_PROMPT.format(
-            objective=item["classification_result"],
+            # objective=item["classification_result"],
+            objective=item["contribution"],
             prediction=item["prediction"],
             gt_recipe=item["recipe"],
         )
@@ -215,7 +218,8 @@ class RecipeJudge:
         messages = [
             {"role": "system", "content": self.system_prompt},
             {"role": "user", "content": USER_PROMPT.format(
-                objective=item["classification_result"],
+                # objective=item["classification_result"],
+                objective=item["contribution"],
                 prediction=item["prediction"],
                 gt_recipe=item["recipe"],
             )},
