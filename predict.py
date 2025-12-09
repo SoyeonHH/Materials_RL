@@ -241,6 +241,9 @@ def predict(
     skip = 0
     if os.path.exists(output_filename):
         skip = len(list(jsonlines.open(output_filename)))
+        if skip >= len(ds):
+            print(f"All {skip} samples already processed")
+            return output_filename
         if skip > 0:
             ds = ds.select(range(skip, len(ds)))
             print(f"Resuming from {skip}, {len(ds)} items remaining")
