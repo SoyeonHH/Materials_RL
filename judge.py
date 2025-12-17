@@ -24,8 +24,20 @@ VLLM_MODELS = [
     "Qwen/Qwen3-30B-A3B-Thinking-2507-FP8",
     "Qwen/Qwen3-30B-A3B-Thinking-2507",
     "Qwen/Qwen3-Next-80B-A3B-Thinking",
+    "Qwen/Qwen3-4B-Instruct-2507",
+    "Qwen/Qwen3-4B-Thinking-2507",
     "deepseek-ai/DeepSeek-R1-Distill-Qwen-32B",
+    "meta-llama/Llama-3.1-8B-Instruct",
+    "meta-llama/Llama-3.3-70B-Instruct",
+    "prometheus-eval/prometheus-7b-v2.0",
     "PrimeIntellect/INTELLECT-3-FP8",
+    "ChemDFM-R-14B",
+    "nuojohnchen/JudgeLRM-7B",
+]
+
+# Models that use JudgeLRM-style output format (<think>/<answer> tags with 1-10 scale)
+JUDGELRM_MODELS = [
+    "nuojohnchen/JudgeLRM-7B",
 ]
 
 # Supported quantization methods
@@ -45,6 +57,11 @@ def is_vllm_model(model: str) -> bool:
     return any(m in model for m in VLLM_MODELS)
 
 
+def is_judgelrm_model(model: str) -> bool:
+    """Check if model uses JudgeLRM-style output format."""
+    return any(m in model for m in JUDGELRM_MODELS)
+
+
 USER_PROMPT = """
 Please evaluate the following:
 
@@ -56,6 +73,7 @@ AI-Generated Recipe:
 
 Ground Truth Recipe:
 {gt_recipe}"""
+
 
 
 class RecipeJudge:
@@ -79,6 +97,7 @@ class RecipeJudge:
         self.system_prompt = open(prompt_filename).read()
         self.enable_thinking = enable_thinking
         self.use_vllm = is_vllm_model(model)
+        self.use_judgelrm = is_judgelrm_model(model)
         self.quantization = quantization
 
         if self.use_vllm:
@@ -175,38 +194,47 @@ class RecipeJudge:
 
     def _judge_vllm(self, item: dict) -> str:
         """Evaluate using local vLLM model."""
-        user_content = USER_PROMPT.format(
-            # objective=item["classification_result"],
-            objective=item["contribution"],
-            prediction=item["prediction"],
-            gt_recipe=item["recipe"],
-        )
-
-        messages = [
-            {"role": "system", "content": self.system_prompt},
-            {"role": "user", "content": user_content},
-        ]
-
-        # Apply chat template
-        if self.enable_thinking:
-            prompt = self.tokenizer.apply_chat_template(
-                messages,
-                tokenize=False,
-                add_generation_prompt=True,
-                enable_thinking=True,
+        # JudgeLRM uses the prompt file as a complete template (includes chat tokens)
+        if self.use_judgelrm:
+            prompt = self.system_prompt.format(
+                objective=item["classification_result"],
+                ai_recipe=item["prediction"],
+                ground_truth_recipe=item["recipe"],
             )
         else:
-            prompt = self.tokenizer.apply_chat_template(
-                messages,
-                tokenize=False,
-                add_generation_prompt=True,
+            user_content = USER_PROMPT.format(
+                objective=item["classification_result"],
+                # objective=item["contribution"],
+                prediction=item["prediction"],
+                gt_recipe=item["recipe"],
             )
+
+            messages = [
+                {"role": "system", "content": self.system_prompt},
+                {"role": "user", "content": user_content},
+            ]
+
+            # Apply chat template
+            if self.enable_thinking:
+                prompt = self.tokenizer.apply_chat_template(
+                    messages,
+                    tokenize=False,
+                    add_generation_prompt=True,
+                    enable_thinking=True,
+                )
+            else:
+                prompt = self.tokenizer.apply_chat_template(
+                    messages,
+                    tokenize=False,
+                    add_generation_prompt=True,
+                )
 
         outputs = self.llm.generate([prompt], self.sampling_params)
         response = outputs[0].outputs[0].text
 
-        # Strip thinking tags if present
-        response = self._strip_thinking_tags(response)
+        # Strip thinking tags if present (keep answer content for JudgeLRM)
+        if not self.use_judgelrm:
+            response = self._strip_thinking_tags(response)
         return response
 
     def _judge_openrouter(self, item: dict) -> str:
@@ -218,8 +246,8 @@ class RecipeJudge:
         messages = [
             {"role": "system", "content": self.system_prompt},
             {"role": "user", "content": USER_PROMPT.format(
-                # objective=item["classification_result"],
-                objective=item["contribution"],
+                objective=item["classification_result"],
+                # objective=item["contribution"],
                 prediction=item["prediction"],
                 gt_recipe=item["recipe"],
             )},
