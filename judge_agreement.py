@@ -47,16 +47,84 @@ def normalize_path(path: str) -> str:
     return path
 
 
-def extract_json_from_text(text: str) -> dict | None:
-    """Extract JSON object from text containing ```json ... ``` blocks."""
+def extract_judgelrm_score(text: str) -> dict | None:
+    """Extract score from JudgeLRM format: <answer>X</answer>.
+
+    JudgeLRM outputs a single integer score (1-10) wrapped in answer tags.
+    This function extracts the score and converts it to 1-5 scale.
+
+    Returns:
+        Dict with overall_score key, or None if extraction fails
+    """
+    # Extract first non-empty <answer>X</answer>
+    match = re.search(r'<answer>\s*(\d+)\s*</answer>', text)
+    if match:
+        score_1_10 = int(match.group(1))
+        # Convert 1-10 scale to 1-5 scale: linear mapping
+        # 1 -> 1, 10 -> 5
+        score_1_5 = (score_1_10 - 1) / 9 * 4 + 1
+        return {"overall_score": round(score_1_5, 2)}
+    return None
+
+
+def extract_json_from_text(text: str, is_judgelrm: bool = False) -> dict | None:
+    """Extract JSON object from text with various formats.
+
+    Supports:
+    - ```json {...} ``` blocks
+    - [JSON score result] {...} format
+    - Plain {...} JSON objects
+    - [...] format (converted to dict if valid)
+    - JudgeLRM <answer>X</answer> format (when is_judgelrm=True)
+    """
+    # Handle JudgeLRM format
+    if is_judgelrm:
+        return extract_judgelrm_score(text)
+
+    # Try ```json block first
     pattern = r"```json\s*(\{[^`]+\})\s*```"
     match = re.search(pattern, text, re.DOTALL)
     if match:
         try:
             return json.loads(match.group(1))
         except json.JSONDecodeError:
-            return None
+            pass
+
+    # Try [JSON score result] {...} format
+    pattern2 = r"\[JSON score result\]\s*(\{[^\}]+\})"
+    match = re.search(pattern2, text, re.DOTALL | re.IGNORECASE)
+    if match:
+        try:
+            return json.loads(match.group(1))
+        except json.JSONDecodeError:
+            pass
+
+    # Try plain JSON object {...} with score keys
+    pattern3 = r'(\{\s*"(?:materials_appropriateness_score|overall_score)[^}]+\})'
+    match = re.search(pattern3, text, re.DOTALL)
+    if match:
+        try:
+            return json.loads(match.group(1))
+        except json.JSONDecodeError:
+            pass
+
+    # Try [...] format (common mistake) and convert to dict
+    pattern4 = r'\[\s*"materials_appropriateness_score":\s*[\d.]+[^\]]+\]'
+    match = re.search(pattern4, text, re.DOTALL)
+    if match:
+        try:
+            # Convert [...] to {...}
+            json_str = match.group(0).replace('[', '{').replace(']', '}')
+            return json.loads(json_str)
+        except json.JSONDecodeError:
+            pass
+
     return None
+
+
+def is_judgelrm_file(filename: str) -> bool:
+    """Check if file is from JudgeLRM model."""
+    return "JudgeLRM" in filename or "judgelrm" in filename.lower()
 
 
 SCORE_KEYS = [
@@ -103,6 +171,8 @@ def load_scores(filename: str) -> dict[str, dict]:
         Dictionary mapping sample id to scores dict
     """
     scores = {}
+    is_judgelrm = is_judgelrm_file(filename)
+
     with jsonlines.open(filename) as reader:
         for item in reader:
             sample_id = item.get("id")
@@ -110,7 +180,7 @@ def load_scores(filename: str) -> dict[str, dict]:
                 continue
 
             judge_result = item.get("judge_result", "")
-            extracted = extract_json_from_text(judge_result)
+            extracted = extract_json_from_text(judge_result, is_judgelrm=is_judgelrm)
 
             if extracted is not None:
                 scores[sample_id] = {
@@ -289,6 +359,8 @@ def load_judge_scores_as_df(filename: str, combine_id_model: bool = False) -> pd
         DataFrame with sample id as index and scores as columns
     """
     records = []
+    is_judgelrm = is_judgelrm_file(filename)
+
     with jsonlines.open(filename) as reader:
         for item in reader:
             sample_id = item.get("id")
@@ -300,7 +372,7 @@ def load_judge_scores_as_df(filename: str, combine_id_model: bool = False) -> pd
                 sample_id = f"{sample_id}-{item['model']}"
 
             judge_result = item.get("judge_result", "")
-            extracted = extract_json_from_text(judge_result)
+            extracted = extract_json_from_text(judge_result, is_judgelrm=is_judgelrm)
 
             if extracted is not None:
                 record = {"id": sample_id}

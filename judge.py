@@ -19,6 +19,40 @@ import fire
 import jsonlines
 from tqdm import tqdm
 
+# Model name aliases for convenience
+MODEL_ALIASES = {
+    # OpenRouter API models
+    "gpt-4o": "openai/gpt-4o",
+    "gpt-4o-mini": "openai/gpt-4o-mini",
+    "gpt-4.1-mini": "openai/gpt-4.1-mini",
+    "o1": "openai/o1",
+    "o1-mini": "openai/o1-mini",
+    "o4-mini": "openai/o4-mini",
+    "claude-sonnet": "anthropic/claude-sonnet-4.5",
+    "claude-opus": "anthropic/claude-opus-4.5",
+    "gemini-pro": "google/gemini-3-pro-preview",
+
+    # Local vLLM models - Qwen
+    "qwen-4b": "Qwen/Qwen3-4B-Thinking-2507",
+    "qwen-4b-instruct": "Qwen/Qwen3-4B-Instruct-2507",
+    "qwen-30b": "Qwen/Qwen3-30B-A3B-Thinking-2507",
+    "qwen-30b-fp8": "Qwen/Qwen3-30B-A3B-Thinking-2507-FP8",
+    "qwen-80b": "Qwen/Qwen3-Next-80B-A3B-Thinking",
+
+    # Local vLLM models - DeepSeek
+    "deepseek-32b": "deepseek-ai/DeepSeek-R1-Distill-Qwen-32B",
+
+    # Local vLLM models - Llama
+    "llama-8b": "meta-llama/Llama-3.1-8B-Instruct",
+    "llama-70b": "meta-llama/Llama-3.3-70B-Instruct",
+
+    # Local vLLM models - Others
+    "prometheus": "prometheus-eval/prometheus-7b-v2.0",
+    "intellect": "PrimeIntellect/INTELLECT-3-FP8",
+    "chemdfm": "ChemDFM-R-14B",
+    "judgelrm": "nuojohnchen/JudgeLRM-7B",
+}
+
 # Local models that should use vLLM instead of OpenRouter
 VLLM_MODELS = [
     "Qwen/Qwen3-30B-A3B-Thinking-2507-FP8",
@@ -42,6 +76,26 @@ JUDGELRM_MODELS = [
 
 # Supported quantization methods
 SUPPORTED_QUANTIZATION = ["awq", "gptq", "fp8", "bitsandbytes"]
+
+
+def resolve_model_name(model: str) -> str:
+    """Resolve model alias to full model name.
+
+    Args:
+        model: Model name or alias
+
+    Returns:
+        Full model name
+
+    Examples:
+        >>> resolve_model_name("gpt-4o")
+        "openai/gpt-4o"
+        >>> resolve_model_name("qwen-4b")
+        "Qwen/Qwen3-4B-Thinking-2507"
+        >>> resolve_model_name("openai/gpt-4o")
+        "openai/gpt-4o"
+    """
+    return MODEL_ALIASES.get(model, model)
 
 
 def get_openrouter_api_key() -> str:
@@ -197,14 +251,15 @@ class RecipeJudge:
         # JudgeLRM uses the prompt file as a complete template (includes chat tokens)
         if self.use_judgelrm:
             prompt = self.system_prompt.format(
-                objective=item["classification_result"],
+                # objective=item["classification_result"],
+                objective=item["contribution"],
                 ai_recipe=item["prediction"],
                 ground_truth_recipe=item["recipe"],
             )
         else:
             user_content = USER_PROMPT.format(
-                objective=item["classification_result"],
-                # objective=item["contribution"],
+                # objective=item["classification_result"],
+                objective=item["contribution"],
                 prediction=item["prediction"],
                 gt_recipe=item["recipe"],
             )
@@ -246,8 +301,8 @@ class RecipeJudge:
         messages = [
             {"role": "system", "content": self.system_prompt},
             {"role": "user", "content": USER_PROMPT.format(
-                objective=item["classification_result"],
-                # objective=item["contribution"],
+                # objective=item["classification_result"],
+                objective=item["contribution"],
                 prediction=item["prediction"],
                 gt_recipe=item["recipe"],
             )},
@@ -299,6 +354,12 @@ def main(
             - "fp8": 8-bit FP8 (Hopper/Ada GPUs only)
             - "bitsandbytes": 4-bit via bitsandbytes
     """
+    # Resolve model alias to full name
+    original_model = model
+    model = resolve_model_name(model)
+    if original_model != model:
+        print(f"Model alias '{original_model}' resolved to '{model}'")
+
     ds = list(jsonlines.open(filename))
     prompt_filename = f"prompts/{prompt_name}.txt"
     judge = RecipeJudge(
@@ -320,7 +381,27 @@ def main(
 
     # Resume from existing progress
     if os.path.exists(output_filename):
-        skip = len(list(jsonlines.open(output_filename)))
+        # Count actual items (not lines) in case file has corrupted lines with multiple JSON objects
+        skip = 0
+        with open(output_filename, 'r') as f:
+            for line in f:
+                line = line.strip()
+                if not line:
+                    continue
+                # Try to parse and count items in this line
+                pos = 0
+                while pos < len(line):
+                    try:
+                        json.loads(line[pos:])
+                        skip += 1
+                        break
+                    except json.JSONDecodeError as e:
+                        if e.msg == "Extra data" and e.pos:
+                            json.loads(line[pos:pos+e.pos])
+                            skip += 1
+                            pos = pos + e.pos
+                        else:
+                            break
         ds = ds[skip:]
         print(f"Skipping {skip} items")
 
